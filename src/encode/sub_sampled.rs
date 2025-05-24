@@ -4,13 +4,11 @@ use super::encoder::{Args, Encoder, EncoderSet, Flags};
 
 // helpers
 
-fn process_subsample<const BLOCK_WIDTH: usize, EncodedBlock, F>(
+fn process_subsample<const BLOCK_WIDTH: usize, EncodedBlock>(
     data: &[[f32; 4]],
     out: &mut [EncodedBlock],
-    f: F,
-) where
-    F: Fn(&[[f32; 4]; BLOCK_WIDTH]) -> EncodedBlock,
-{
+    f: impl Fn(&[[f32; 4]; BLOCK_WIDTH]) -> EncodedBlock,
+) {
     let full_blocks_len = data.len() / BLOCK_WIDTH * BLOCK_WIDTH;
     let rest = data.len() - full_blocks_len;
 
@@ -32,7 +30,7 @@ fn process_subsample<const BLOCK_WIDTH: usize, EncodedBlock, F>(
 fn uncompressed_universal_subsample<EncodedBlock>(
     args: Args,
     block_width: usize,
-    process: fn(&[[f32; 4]], &mut [EncodedBlock]),
+    process: fn(usize, &[[f32; 4]], &mut [EncodedBlock]),
 ) -> Result<(), EncodingError>
 where
     EncodedBlock: Default + Copy + cast::ToLe + cast::Castable,
@@ -60,7 +58,7 @@ where
     let chunk_count = height * util::div_ceil(width * bytes_per_pixel, chunk_size);
     let mut chunk_index: usize = 0;
 
-    for y_line in data.chunks(width * bytes_per_pixel) {
+    for (y_index, y_line) in data.chunks(width * bytes_per_pixel).enumerate() {
         debug_assert!(y_line.len() == width * bytes_per_pixel);
 
         for chunk in y_line.chunks(chunk_size) {
@@ -75,7 +73,7 @@ where
             let intermediate = &mut intermediate_buffer[..pixels];
             let encoded = &mut encoded_buffer[..util::div_ceil(pixels, block_width)];
 
-            process(as_rgba_f32(color, chunk, intermediate), encoded);
+            process(y_index, as_rgba_f32(color, chunk, intermediate), encoded);
 
             cast::ToLe::to_le(encoded);
 
@@ -88,8 +86,23 @@ where
 
 macro_rules! universal_subsample {
     ($block_width:literal, $out:ty, $f:expr) => {{
-        fn process_blocks(block: &[[f32; 4]], out: &mut [$out]) {
-            process_subsample::<$block_width, $out, _>(block, out, $f);
+        fn process_blocks(_block_y: usize, block: &[[f32; 4]], out: &mut [$out]) {
+            process_subsample::<$block_width, $out>(block, out, $f);
+        }
+        Encoder::new_universal(|args| {
+            uncompressed_universal_subsample(args, $block_width, process_blocks)
+        })
+    }};
+}
+macro_rules! universal_subsample_dither {
+    ($block_width:literal, $out:ty, $f:expr) => {{
+        type Block = [[f32; 4]; $block_width];
+        fn process_blocks(block_y: usize, block: &[[f32; 4]], out: &mut [$out]) {
+            let f = move |block: &Block| -> $out {
+                let g = util::closure_types2::<usize, &Block, $out, _>($f);
+                g(block_y, block)
+            };
+            process_subsample::<$block_width, $out>(block, out, f);
         }
         Encoder::new_universal(|args| {
             uncompressed_universal_subsample(args, $block_width, process_blocks)
@@ -163,10 +176,33 @@ pub(crate) const Y210: EncoderSet =
 pub(crate) const Y216: EncoderSet =
     EncoderSet::new(&[universal_subsample!(2, [u16; 4], to_y216).add_flags(Flags::EXACT_U8)]);
 
-pub(crate) const R1_UNORM: EncoderSet = EncoderSet::new(&[universal_subsample!(8, u8, |block| {
-    let mut out = 0_u8;
-    for (i, &p) in block.iter().enumerate() {
-        out |= n1::from_f32(ch::rgba_to_grayscale(p)[0]) << (7 - i);
-    }
-    out
-})]);
+pub(crate) const R1_UNORM: EncoderSet = EncoderSet::new(&[
+    universal_subsample!(8, u8, |block| {
+        let mut out = 0_u8;
+        for (i, &p) in block.iter().enumerate() {
+            out |= n1::from_f32(ch::rgba_to_grayscale(p)[0]) << (7 - i);
+        }
+        out
+    }),
+    universal_subsample_dither!(8, u8, |block_y, block| {
+        #[allow(clippy::eq_op)]
+        #[rustfmt::skip]
+        const BAYER_8X8: [[f32; 8]; 8] = [
+            [0. / 64. - 0.5, 32. / 64. - 0.5, 8. / 64. - 0.5, 40. / 64. - 0.5, 2. / 64. - 0.5, 34. / 64. - 0.5, 10. / 64. - 0.5, 42. / 64. - 0.5],
+            [48. / 64. - 0.5, 16. / 64. - 0.5, 56. / 64. - 0.5, 24. / 64. - 0.5, 50. / 64. - 0.5, 18. / 64. - 0.5, 58. / 64. - 0.5, 26. / 64. - 0.5],
+            [12. / 64. - 0.5, 44. / 64. - 0.5, 4. / 64. - 0.5, 36. / 64. - 0.5, 14. / 64. - 0.5, 46. / 64. - 0.5, 6. / 64. - 0.5, 38. / 64. - 0.5],
+            [60. / 64. - 0.5, 28. / 64. - 0.5, 52. / 64. - 0.5, 20. / 64. - 0.5, 62. / 64. - 0.5, 30. / 64. - 0.5, 54. / 64. - 0.5, 22. / 64. - 0.5],
+            [3. / 64. - 0.5, 35. / 64. - 0.5, 11. / 64. - 0.5, 43. / 64. - 0.5, 1. / 64. - 0.5, 33. / 64. - 0.5, 9. / 64. - 0.5, 41. / 64. - 0.5],
+            [51. / 64. - 0.5, 19. / 64. - 0.5, 59. / 64. - 0.5, 27. / 64. - 0.5, 49. / 64. - 0.5, 17. / 64. - 0.5, 57. / 64. - 0.5, 25. / 64. - 0.5],
+            [15. / 64. - 0.5, 47. / 64. - 0.5, 7. / 64. - 0.5, 39. / 64. - 0.5, 13. / 64. - 0.5, 45. / 64. - 0.5, 5. / 64. - 0.5, 37. / 64. - 0.5],
+            [63. / 64. - 0.5, 31. / 64. - 0.5, 55. / 64. - 0.5, 23. / 64. - 0.5, 61. / 64. - 0.5, 29. / 64. - 0.5, 53. / 64. - 0.5, 21. / 64. - 0.5]
+        ];
+        let bayer = &BAYER_8X8[block_y % 8];
+
+        let mut out = 0_u8;
+        for (i, &p) in block.iter().enumerate() {
+            out |= n1::from_f32(ch::rgba_to_grayscale(p)[0] + bayer[i]) << (7 - i);
+        }
+        out
+    }).add_flags(Flags::DITHER_COLOR),
+]);

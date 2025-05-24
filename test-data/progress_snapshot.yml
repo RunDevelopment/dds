@@ -209,6 +209,19 @@ R1_UNORM:
     100.00%
     Done.
 
+  "Dither ColorAndAlpha: Rgba U8 Image 4096x2048": |
+    0.00%
+    25.00%
+    50.00%
+    75.00%
+    100.00%
+    Done.
+
+  "Dither ColorAndAlpha: Grayscale F32 Image 1024x1024": |
+    0.00%
+    100.00%
+    Done.
+
 
 
 R8G8_B8G8_UNORM:

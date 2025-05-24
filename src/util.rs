@@ -95,6 +95,9 @@ pub(crate) fn two_powi(exponent: i8) -> f32 {
 pub(crate) fn closure_types<A, B, F: Fn(A) -> B>(f: F) -> F {
     f
 }
+pub(crate) fn closure_types2<A1, A2, B, F: Fn(A1, A2) -> B>(f: F) -> F {
+    f
+}
 pub(crate) fn closure_types3<A1, A2, A3, B, F: Fn(A1, A2, A3) -> B>(f: F) -> F {
     f
 }

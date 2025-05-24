@@ -52,7 +52,7 @@
 | Y410                          | RGBA  U16 | 32  | DX10   |        | ✔️       | Alpha only | ✔️     |
 | Y416                          | RGBA  U16 | 64  | DX10   |        | ✔️       |            | ✔️     |
 | — *Subsampled*                |           |     |        |        |          |            |        |
-| R1_UNORM                      | Gray  U8  | 1   | DX10   |        | ✔️       |            | ✔️     |
+| R1_UNORM                      | Gray  U8  | 1   | DX10   |        | ✔️       | ✔️         | ✔️     |
 | R8G8_B8G8_UNORM               | RGB   U8  | 16  | ☑️     | RGBG   | ✔️       |            | ✔️     |
 | G8R8_G8B8_UNORM               | RGB   U8  | 16  | ☑️     | GRGB   | ✔️       |            | ✔️     |
 | UYVY                          | RGB   U8  | 16  | DX9    | UYVY   | ✔️       |            | ✔️     |

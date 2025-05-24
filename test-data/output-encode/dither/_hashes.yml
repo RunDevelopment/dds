@@ -43,6 +43,12 @@ R10G10B10_XR_BIAS_A2_UNORM twirl.dds: >
 Y410 base.dds: >
     0049b22cc709b930fb32d66a3c81cb091ffd9cc20740b29c39c8005c5626de94
 
+R1_UNORM base.dds: >
+    72b8afa559c26993c545c8cd471879c3722fbd76ecbd8d28fd3d673093a4e28c
+
+R1_UNORM twirl.dds: >
+    14c599af216f9121fd80324a22d40ea57cc09db5a4dcf79b5580c32349293b8c
+
 BC1_UNORM base.dds: >
     d54a4142a30dc588628d78cb8a795da9ffbce9bfab3f72af892cbe35c9c01264
 
